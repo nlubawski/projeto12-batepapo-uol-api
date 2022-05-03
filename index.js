@@ -31,7 +31,7 @@ const participantSchema = joi.object({
 });
 
 const messageSchema = joi.object({
-    to: joi.string().required(), 
+    to: joi.string().required(),
     text: joi.string().required(),
     type: joi.string().valid("message", "private_message").required(),
     from: joi.required(),
@@ -39,11 +39,11 @@ const messageSchema = joi.object({
 });
 
 app.post("/participants", async (req, res) => {
-    const {body} = req;
+    const { body } = req;
 
     try {
-        await participantSchema.validateAsync(body, { abortEarly: false});
-    } catch(e) {
+        await participantSchema.validateAsync(body, { abortEarly: false });
+    } catch (error) {
         res.status(422).send("deu erro");
         return;
     }
@@ -60,11 +60,11 @@ app.post("/participants", async (req, res) => {
         type: "status",
         time: dayjs().format("HH:mm:ss")
     }
-    
+
     try {
 
-        const participants = await db.collection("participants").find({name: body.name}).toArray();
-        
+        const participants = await db.collection("participants").find({ name: body.name }).toArray();
+
         if (participants.length !== 0) {
             res.sendStatus(409);
             return;
@@ -73,9 +73,9 @@ app.post("/participants", async (req, res) => {
         await db.collection("participants").insertOne(user);
         await db.collection("messages").insertOne(message);
         res.sendStatus(201);
-    } catch(e) {
+    } catch (error) {
         console.log("Deu erro: post /participants", e);
-        res.status(422).send(e);
+        res.status(422).send(error);
     }
 });
 
@@ -83,8 +83,43 @@ app.get("/participants", async (req, res) => {
     try {
         const users = await db.collection("participants").find({}).toArray();
         res.send(users);
-    } catch(error) {
+    } catch (error) {
         console.log(" Erro no get: /participants", error);
+        res.status(422).send(error);
+    }
+});
+
+app.post("/messages", async (req, res) => {
+    const { body } = req;
+    const userFrom = req.header("user");
+
+    const message = {
+        from: userFrom,
+        to: body.to,
+        text: body.text,
+        type: body.type,
+        time: dayjs().format("HH:mm:ss")
+    };
+
+    try {
+        await messageSchema.validateAsync(message, { abortEarly: false });
+    } catch (error) {
+        res.status(422).send("deu erro");
+        return;
+    }
+
+    try {
+        const users = await db.collection("participants").findOne({ name: userFrom });
+
+        if (!users) {
+            res.sendStatus(422);
+            console.log("Participante já cadastrado");
+            return;
+        }
+        await db.collection("messages").insertOne(message);
+        res.sendStatus(201);
+    } catch (error) {
+        console.log("Erro no post: /messages", error);
         res.status(422).send(error);
     }
 });
