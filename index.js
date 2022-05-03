@@ -79,6 +79,14 @@ app.post("/participants", async (req, res) => {
     }
 });
 
-
+app.get("/participants", async (req, res) => {
+    try {
+        const users = await db.collection("participants").find({}).toArray();
+        res.send(users);
+    } catch(error) {
+        console.log(" Erro no get: /participants", error);
+        res.status(422).send(error);
+    }
+});
 
 app.listen(port, () => console.log(`Servidor em pé na porta ${port}`));
