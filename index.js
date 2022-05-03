@@ -1,9 +1,10 @@
 import express, { json } from "express";
 import cors from "cors";
-import { MongoClient, ObjectId } from "mongodb";
+import { LoggerLevel, MongoClient, ObjectId } from "mongodb";
 import dotenv from "dotenv";
 import joi from "joi";
 import dayjs from "dayjs";
+import res from "express/lib/response";
 
 const app = express();
 app.use(cors());
@@ -90,38 +91,68 @@ app.get("/participants", async (req, res) => {
 });
 
 app.post("/messages", async (req, res) => {
-    const { body } = req;
+    const {body} = req;
     const userFrom = req.header("user");
-
     const message = {
         from: userFrom,
         to: body.to,
         text: body.text,
         type: body.type,
         time: dayjs().format("HH:mm:ss")
-    };
+    }
 
     try {
-        await messageSchema.validateAsync(message, { abortEarly: false });
-    } catch (error) {
-        res.status(422).send("deu erro");
+        await messageSchema.validateAsync(message, {abortEarly: false})
+    } catch(error) {
+        res.status(422).send("deu erro")
         return;
     }
 
     try {
-        const users = await db.collection("participants").findOne({ name: userFrom });
-
-        if (!users) {
-            res.sendStatus(422);
-            console.log("Participante já cadastrado");
+        const users = await db.collection("participants").findOne({name: userFrom})
+        if (!users){
+            res.sendStatus(422)
             return;
         }
-        await db.collection("messages").insertOne(message);
-        res.sendStatus(201);
-    } catch (error) {
-        console.log("Erro no post: /messages", error);
-        res.status(422).send(error);
+
+        await db.collection("messages").insertOne(message)
+        res.sendStatus(201)
     }
-});
+        
+    catch (error) {
+        console.log("erro no post: /messages", error)
+        res.status(422).send(error)
+    };
+
+})
+
+app.get("/messages", async (req, res) => {
+    let{limit} = req.query;
+    const userFrom = req.header.apply("user");
+    if(!limit){
+        limit = 100
+    }
+
+    try {
+        const messages = await db.collection("messages").find({$or: [{from: userFrom}, {to: userFrom}, {to: 'Todos'}]}).toArray()
+        const invertedMessages = messages.reverse()
+        const limitedMessages = []
+
+        for(let i =0; i < invertedMessages.length; i++){
+            if(i < limit){
+                limitedMessages.push(invertedMessages[i])
+            }
+            else{
+                break;
+            }
+        }
+
+        res.send(limitedMessages.reverse())
+    }
+    catch(error){
+        console.log("erro no get: /messages", error)
+        res.status(422).send(error)
+    }
+})
 
 app.listen(port, () => console.log(`Servidor em pé na porta ${port}`));
