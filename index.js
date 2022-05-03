@@ -4,7 +4,6 @@ import { LoggerLevel, MongoClient, ObjectId } from "mongodb";
 import dotenv from "dotenv";
 import joi from "joi";
 import dayjs from "dayjs";
-import res from "express/lib/response";
 
 const app = express();
 app.use(cors());
@@ -75,7 +74,7 @@ app.post("/participants", async (req, res) => {
         await db.collection("messages").insertOne(message);
         res.sendStatus(201);
     } catch (error) {
-        console.log("Deu erro: post /participants", e);
+        console.log("Deu erro: post /participants", error);
         res.status(422).send(error);
     }
 });
@@ -92,7 +91,7 @@ app.get("/participants", async (req, res) => {
 
 app.post("/messages", async (req, res) => {
     const {body} = req;
-    const userFrom = req.header("user");
+    const userFrom = req.headers("user");
     const message = {
         from: userFrom,
         to: body.to,
@@ -127,14 +126,15 @@ app.post("/messages", async (req, res) => {
 })
 
 app.get("/messages", async (req, res) => {
-    let{limit} = req.query;
-    const userFrom = req.header.apply("user");
+    let {limit} = req.query;
+    const {user} = req.headers;
     if(!limit){
         limit = 100
     }
 
     try {
-        const messages = await db.collection("messages").find({$or: [{from: userFrom}, {to: userFrom}, {to: 'Todos'}]}).toArray()
+        const messages = await db.collection("messages").find({$or: [{from: user}, {to: user}, {to: 'Todos'}]}).toArray()
+
         const invertedMessages = messages.reverse()
         const limitedMessages = []
 
@@ -154,5 +154,25 @@ app.get("/messages", async (req, res) => {
         res.status(422).send(error)
     }
 })
+
+app.post("/status", async (req, res) => {
+    const {user} = req.headers
+
+    try {
+        const user = await db.collection("participants").find({name: user}).toArray();
+        if(!user){
+            res.sendStatus(404)
+            console.log("usuario nao encontrado")
+            return
+        }
+        await db.collection("participants").updateOne({name:user}, {$set: {lastStatus:Date.now()}})
+        res.sendStatus(200)
+    }
+    catch(error){
+        console.log("erro no post: /status")
+        res.status(404).send(error)
+    }
+})
+
 
 app.listen(port, () => console.log(`Servidor em pé na porta ${port}`));
